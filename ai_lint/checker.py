@@ -59,12 +59,15 @@ POLICY:
 TRANSCRIPT:
 {transcript}"""
 
-    result = subprocess.run(
-        ["claude", "-p", prompt, "--output-format", "json"],
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
+    try:
+        result = subprocess.run(
+            ["claude", "-p", prompt, "--output-format", "json"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("claude -p timed out after 120 seconds")
 
     if result.returncode != 0:
         raise RuntimeError(f"claude -p failed:\n{result.stderr}")
@@ -83,7 +86,10 @@ TRANSCRIPT:
     # Strip markdown code fences if the LLM added them anyway
     if raw.startswith("```"):
         lines = raw.split("\n")
-        lines = [l for l in lines if not l.startswith("```")]
+        if len(lines) >= 2 and lines[-1].startswith("```"):
+            lines = lines[1:-1]
+        else:
+            lines = lines[1:]
         raw = "\n".join(lines)
 
     try:
