@@ -114,10 +114,11 @@ def sample_verdicts():
     """Return a dict matching the run_check output format."""
     return {
         "verdicts": [
-            {"rule": "Understanding before action", "verdict": "PASS", "reasoning": "Developer showed understanding."},
-            {"rule": "No credential exposure", "verdict": "PASS", "reasoning": "No secrets found."},
-            {"rule": "Review AI output", "verdict": "FAIL", "reasoning": "Developer did not review."},
-            {"rule": "Testing mentioned", "verdict": "SKIP", "reasoning": "No code written."},
+            {"category": "Security", "rule": "No credential exposure", "verdict": "PASS", "reasoning": "No secrets found."},
+            {"category": "Security", "rule": "No sensitive data in prompts", "verdict": "PASS", "reasoning": "No PII detected."},
+            {"category": "Developer Engagement", "rule": "Understanding before delegation", "verdict": "PASS", "reasoning": "Developer showed understanding."},
+            {"category": "Developer Engagement", "rule": "Review before acceptance", "verdict": "FAIL", "reasoning": "Developer did not review."},
+            {"category": "Process Discipline", "rule": "Testing discussed or performed", "verdict": "SKIP", "reasoning": "No code written."},
         ],
         "summary": "Mostly compliant session.",
     }

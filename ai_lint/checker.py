@@ -6,14 +6,22 @@ import subprocess
 import sys
 
 
-SYSTEM_PROMPT = """You are a compliance auditor. You will receive a session transcript from an AI coding session and a policy document with numbered rules.
+SYSTEM_PROMPT = """You are a compliance auditor for AI coding sessions. You will receive a session transcript and a policy document organized into sections (e.g., Security, Developer Engagement, Process Discipline).
 
-For each rule in the policy, evaluate whether the session complies. Return ONLY valid JSON — no markdown fences, no commentary outside the JSON.
+Evaluate each section INDEPENDENTLY. A violation in one section must not influence your judgment in another. For each rule, base your verdict only on what is visible in the transcript.
+
+Evaluation guidance:
+- For pattern-based rules (credential exposure, destructive commands): scan for specific indicators in user messages, assistant messages, and tool_use blocks (Bash, Write, Edit, Read).
+- For behavioral rules (engagement, review discipline): assess the overall conversational pattern across the session — who drives the work, how the developer responds to AI output, and whether the developer demonstrates understanding.
+- For process rules (scope, testing): look at the session arc — does it have structure, does it stay focused, are there checkpoints?
+
+Return ONLY valid JSON — no markdown fences, no commentary outside the JSON.
 
 Response format:
 {
   "verdicts": [
     {
+      "category": "Section name",
       "rule": "Rule name",
       "verdict": "PASS" | "FAIL" | "SKIP",
       "reasoning": "One sentence explanation"
@@ -22,12 +30,12 @@ Response format:
   "summary": "One paragraph overall assessment"
 }
 
-Rules:
+Verdict meanings:
 - PASS: The session clearly complies with this rule.
 - FAIL: The session clearly violates this rule.
 - SKIP: The rule is not applicable to this session (e.g., no code was written, so testing rules don't apply).
 
-Be fair but firm. Base verdicts only on what's visible in the transcript."""
+You MUST evaluate every rule in the policy. Be fair but firm."""
 
 
 def check_claude_installed() -> bool:
@@ -102,6 +110,15 @@ TRANSCRIPT:
     return verdicts
 
 
+def _group_by_category(verdicts: list[dict]) -> list[tuple[str, list[dict]]]:
+    """Group verdicts by category, preserving order of first appearance."""
+    groups: dict[str, list[dict]] = {}
+    for v in verdicts:
+        cat = v.get("category", "General")
+        groups.setdefault(cat, []).append(v)
+    return list(groups.items())
+
+
 def format_verdicts(result: dict) -> str:
     """Format verdicts dict into a readable terminal string."""
     lines = []
@@ -111,10 +128,12 @@ def format_verdicts(result: dict) -> str:
     fail_count = sum(1 for v in verdicts if v["verdict"] == "FAIL")
     skip_count = sum(1 for v in verdicts if v["verdict"] == "SKIP")
 
-    for v in verdicts:
-        icon = {"PASS": "+", "FAIL": "x", "SKIP": "-"}.get(v["verdict"], "?")
-        lines.append(f"  [{icon}] {v['verdict']}: {v['rule']}")
-        lines.append(f"      {v['reasoning']}")
+    for category, group in _group_by_category(verdicts):
+        lines.append(f"  {category}")
+        for v in group:
+            icon = {"PASS": "+", "FAIL": "x", "SKIP": "-"}.get(v["verdict"], "?")
+            lines.append(f"  [{icon}] {v['verdict']}: {v['rule']}")
+            lines.append(f"      {v['reasoning']}")
         lines.append("")
 
     lines.append(f"Results: {pass_count} passed, {fail_count} failed, {skip_count} skipped")
@@ -148,10 +167,14 @@ def format_report_markdown(session_results: list[dict]) -> str:
         lines.append(f"## {label}")
         lines.append("")
 
-        for v in verdicts:
-            icon = {"PASS": "✅", "FAIL": "❌", "SKIP": "⏭️"}.get(v["verdict"], "❓")
-            lines.append(f"- {icon} **{v['verdict']}**: {v['rule']}")
-            lines.append(f"  - {v['reasoning']}")
+        for category, group in _group_by_category(verdicts):
+            lines.append(f"### {category}")
+            lines.append("")
+            for v in group:
+                icon = {"PASS": "✅", "FAIL": "❌", "SKIP": "⏭️"}.get(v["verdict"], "❓")
+                lines.append(f"- {icon} **{v['verdict']}**: {v['rule']}")
+                lines.append(f"  - {v['reasoning']}")
+            lines.append("")
 
         p = sum(1 for v in verdicts if v["verdict"] == "PASS")
         f_ = sum(1 for v in verdicts if v["verdict"] == "FAIL")

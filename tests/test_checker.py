@@ -99,9 +99,15 @@ class TestFormatVerdicts:
         assert "[+] PASS" in output
         assert "[x] FAIL" in output
         assert "[-] SKIP" in output
-        assert "2 passed" in output
+        assert "3 passed" in output
         assert "1 failed" in output
         assert "1 skipped" in output
+
+    def test_category_headers(self, sample_verdicts):
+        output = format_verdicts(sample_verdicts)
+        assert "Security" in output
+        assert "Developer Engagement" in output
+        assert "Process Discipline" in output
 
     def test_includes_summary(self, sample_verdicts):
         output = format_verdicts(sample_verdicts)
@@ -120,6 +126,15 @@ class TestFormatVerdicts:
         output = format_verdicts({"verdicts": [], "summary": ""})
         assert "Summary:" not in output
 
+    def test_missing_category_falls_back(self):
+        result = {
+            "verdicts": [{"rule": "R1", "verdict": "PASS", "reasoning": "ok"}],
+            "summary": "",
+        }
+        output = format_verdicts(result)
+        assert "General" in output
+        assert "[+] PASS" in output
+
 
 class TestFormatReportMarkdown:
     def test_header(self, sample_verdicts):
@@ -131,6 +146,12 @@ class TestFormatReportMarkdown:
         assert "\u2705" in report  # checkmark
         assert "\u274c" in report  # X
 
+    def test_category_sections_in_report(self, sample_verdicts):
+        report = format_report_markdown([{"session_label": "Session A", "result": sample_verdicts}])
+        assert "### Security" in report
+        assert "### Developer Engagement" in report
+        assert "### Process Discipline" in report
+
     def test_multi_session_totals(self, sample_verdicts):
         entries = [
             {"session_label": "A", "result": sample_verdicts},
@@ -138,12 +159,12 @@ class TestFormatReportMarkdown:
         ]
         report = format_report_markdown(entries)
         assert "Sessions checked: 2" in report
-        assert "4 passed" in report  # 2 per session
+        assert "6 passed" in report  # 3 per session
         assert "2 failed" in report
 
     def test_per_session_score(self, sample_verdicts):
         report = format_report_markdown([{"session_label": "S1", "result": sample_verdicts}])
-        assert "2 passed, 1 failed, 1 skipped" in report
+        assert "3 passed, 1 failed, 1 skipped" in report
 
     def test_session_summary_quoted(self, sample_verdicts):
         report = format_report_markdown([{"session_label": "S1", "result": sample_verdicts}])

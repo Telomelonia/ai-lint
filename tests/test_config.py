@@ -66,7 +66,7 @@ class TestInstallPolicy:
 class TestReadPolicy:
     def test_reads_content(self, installed_policy):
         text = read_policy()
-        assert "AI Usage Policy" in text
+        assert "AI Session Policy" in text
 
     def test_no_policy_raises(self, config_dir):
         with pytest.raises(FileNotFoundError, match="No policy found"):
