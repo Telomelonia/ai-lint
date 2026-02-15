@@ -11,7 +11,6 @@ TEMPLATES_DIR = Path(__file__).parent / "templates"
 PERSONAS = {
     "self": "policy_self.md",
     "team": "policy_team.md",
-    "parent": "policy_parent.md",
 }
 
 

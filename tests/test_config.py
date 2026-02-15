@@ -38,7 +38,7 @@ class TestPolicyExists:
 
 
 class TestInstallPolicy:
-    @pytest.mark.parametrize("persona", ["self", "team", "parent"])
+    @pytest.mark.parametrize("persona", ["self", "team"])
     def test_installs_all_personas(self, config_dir, persona, monkeypatch):
         install_policy(persona)
         policy_file = config_dir / "policy.md"
@@ -110,4 +110,4 @@ class TestPersonas:
             assert (templates_dir / filename).exists(), f"Missing template for {persona}"
 
     def test_persona_count(self):
-        assert len(PERSONAS) == 3
+        assert len(PERSONAS) == 2

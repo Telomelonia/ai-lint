@@ -48,16 +48,15 @@ def init():
 
     # 2. Choose persona
     click.echo("Who are you?\n")
-    click.echo("  1. self   — Individual developer checking your own habits")
-    click.echo("  2. team   — Team lead/manager enforcing guidelines")
-    click.echo("  3. parent — Parent monitoring a child's AI usage")
+    click.echo("  1. self — Individual developer checking your own habits")
+    click.echo("  2. team — Team lead/manager enforcing guidelines")
     click.echo()
 
     choice = click.prompt(
         "Choose a persona",
-        type=click.Choice(["1", "2", "3", "self", "team", "parent"]),
+        type=click.Choice(["1", "2", "self", "team"]),
     )
-    persona_map = {"1": "self", "2": "team", "3": "parent"}
+    persona_map = {"1": "self", "2": "team"}
     persona = persona_map.get(choice, choice)
 
     # 3. Install policy

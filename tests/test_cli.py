@@ -31,7 +31,7 @@ def full_setup(config_dir, installed_policy, claude_projects_dir, sample_jsonl_s
 
 
 class TestInit:
-    @pytest.mark.parametrize("choice", ["1", "2", "3", "self", "team", "parent"])
+    @pytest.mark.parametrize("choice", ["1", "2", "self", "team"])
     def test_all_persona_choices(self, runner, config_dir, claude_settings_dir, monkeypatch, choice):
         monkeypatch.setattr("ai_lint.cli.check_claude_installed", lambda: True)
         monkeypatch.setattr("ai_lint.cli.is_hook_installed", lambda: False)
