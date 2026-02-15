@@ -31,7 +31,7 @@ All notable changes to ai-lint will be documented in this file.
   - `-o` flag to specify output file
 - `ai-lint policy` — open policy file in your default editor
 - `ai-lint hook install` / `ai-lint hook uninstall` — manage SessionEnd hook
-- Three built-in policy templates: self, team, parent
+- Two built-in policy templates: self, team
 - Session discovery from `~/.claude/projects/` with subagent filtering
 - JSONL transcript parsing with tool use/result extraction
 - JSON verdict parsing with markdown fence stripping
