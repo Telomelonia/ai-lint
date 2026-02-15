@@ -1,6 +1,7 @@
 """Send transcript + policy to claude -p and parse compliance verdicts."""
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -69,7 +70,8 @@ TRANSCRIPT:
 
     try:
         result = subprocess.run(
-            ["claude", "-p", prompt, "--output-format", "json"],
+            ["claude", "-p", "--output-format", "json"],
+            input=prompt,
             capture_output=True,
             text=True,
             timeout=120,
@@ -87,18 +89,14 @@ TRANSCRIPT:
         wrapper = json.loads(raw)
         # If claude returned structured output, extract the text result
         if isinstance(wrapper, dict) and "result" in wrapper:
-            raw = wrapper["result"]
+            raw = wrapper["result"].strip()
     except json.JSONDecodeError:
         pass
 
-    # Strip markdown code fences if the LLM added them anyway
-    if raw.startswith("```"):
-        lines = raw.split("\n")
-        if len(lines) >= 2 and lines[-1].startswith("```"):
-            lines = lines[1:-1]
-        else:
-            lines = lines[1:]
-        raw = "\n".join(lines)
+    # Extract JSON from markdown code fences anywhere in the response
+    fence_match = re.search(r"```(?:json)?\s*\n(.*?)\n\s*```", raw, re.DOTALL)
+    if fence_match:
+        raw = fence_match.group(1)
 
     try:
         verdicts = json.loads(raw)

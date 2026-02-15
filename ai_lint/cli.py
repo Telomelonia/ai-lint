@@ -25,6 +25,7 @@ from ai_lint.sessions import (
     parse_session,
 )
 from ai_lint.setup_hook import install_hook, is_hook_installed
+from ai_lint.spinner import Spinner
 
 
 @click.group()
@@ -126,10 +127,11 @@ def check(last, quiet):
     policy = read_policy()
 
     if not quiet:
-        click.echo(f"Checking {len(selected.messages)} messages against policy...\n")
+        click.echo(f"Checking {len(selected.messages)} messages against policy...")
 
     try:
-        result = run_check(transcript, policy)
+        with Spinner("Analyzing with claude..."):
+            result = run_check(transcript, policy)
     except RuntimeError as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
@@ -160,10 +162,10 @@ def report(count, outfile):
         parse_session(s)
         if not s.messages:
             continue
-        click.echo(f"[{i}/{len(to_check)}] Checking {s.label}...")
         transcript = format_transcript(s)
         try:
-            result = run_check(transcript, policy)
+            with Spinner(f"[{i}/{len(to_check)}] Checking {s.label}..."):
+                result = run_check(transcript, policy)
         except RuntimeError as e:
             click.echo(f"  Error: {e}", err=True)
             continue

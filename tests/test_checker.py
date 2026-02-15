@@ -80,6 +80,38 @@ class TestRunCheck:
         result = run_check("transcript", "policy")
         assert result["summary"] == "ok"
 
+    def test_fence_stripping_after_wrapper_extraction(self, monkeypatch):
+        """Fence stripping works when wrapper result has leading whitespace."""
+        monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
+        inner = {"verdicts": [], "summary": "ok"}
+        fenced = "\n\n```json\n" + json.dumps(inner) + "\n```"
+        wrapper = {"result": fenced}
+
+        class FakeResult:
+            returncode = 0
+            stdout = json.dumps(wrapper)
+            stderr = ""
+
+        monkeypatch.setattr("subprocess.run", lambda *a, **kw: FakeResult())
+        result = run_check("transcript", "policy")
+        assert result["summary"] == "ok"
+
+    def test_fence_stripping_with_prose_before(self, monkeypatch):
+        """Fence extraction works when LLM adds commentary before the JSON block."""
+        monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
+        inner = {"verdicts": [], "summary": "ok"}
+        raw_text = "Let me analyze this session.\n\n```json\n" + json.dumps(inner) + "\n```"
+        wrapper = {"result": raw_text}
+
+        class FakeResult:
+            returncode = 0
+            stdout = json.dumps(wrapper)
+            stderr = ""
+
+        monkeypatch.setattr("subprocess.run", lambda *a, **kw: FakeResult())
+        result = run_check("transcript", "policy")
+        assert result["summary"] == "ok"
+
     def test_invalid_json_raises(self, monkeypatch):
         monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
 

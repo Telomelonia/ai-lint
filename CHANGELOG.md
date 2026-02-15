@@ -2,6 +2,16 @@
 
 All notable changes to ai-lint will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- JSON parsing failure when `claude -p` wraps response in `{"result": "\n\n```json...```"}` — inner result now `.strip()`ed before fence extraction
+- JSON parsing failure when LLM adds prose before the fenced JSON block — fence extraction now uses regex to find fenced JSON anywhere in the response
+- Large transcripts failing silently — prompt now sent via stdin instead of CLI argument to avoid OS argument length limits
+
+### Added
+- Loading spinner animation while `claude -p` runs (braille dot frames on stderr)
+
 ## [0.2.0] - 2026-02-15 (`12e688d`)
 
 ### Changed
