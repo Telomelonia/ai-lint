@@ -3,20 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
-    paths:
-      - "ai_lint/**"
-      - "tests/**"
-      - "pyproject.toml"
-      - "CHANGELOG.md"
-      - ".github/workflows/ci.yml"
   pull_request:
     branches: [main]
-    paths:
-      - "ai_lint/**"
-      - "tests/**"
-      - "pyproject.toml"
-      - "CHANGELOG.md"
-      - ".github/workflows/ci.yml"
 
 jobs:
   test:
@@ -38,3 +26,41 @@ jobs:
 
       - name: Run tests
         run: pytest -v
+
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check CHANGELOG.md updated
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE=${{ github.event.pull_request.base.sha }}
+          else
+            BASE=${{ github.event.before }}
+          fi
+
+          # Check if any source files changed
+          SOURCE_CHANGED=$(git diff --name-only "$BASE" HEAD -- ai_lint/ tests/ pyproject.toml || true)
+
+          if [ -z "$SOURCE_CHANGED" ]; then
+            echo "No source changes — changelog not required."
+            exit 0
+          fi
+
+          # Check if CHANGELOG.md was updated
+          CHANGELOG_CHANGED=$(git diff --name-only "$BASE" HEAD -- CHANGELOG.md || true)
+
+          if [ -z "$CHANGELOG_CHANGED" ]; then
+            echo "::error::Source files changed but CHANGELOG.md was not updated."
+            echo ""
+            echo "Changed files:"
+            echo "$SOURCE_CHANGED"
+            echo ""
+            echo "Please add an entry to CHANGELOG.md describing your changes."
+            exit 1
+          fi
+
+          echo "CHANGELOG.md was updated — check passed."
