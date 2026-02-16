@@ -11,6 +11,10 @@ All notable changes to ai-lint will be documented in this file.
 
 ### Added
 - Loading spinner animation while `claude -p` runs (braille dot frames on stderr)
+- **Per-session insights** alongside compliance verdicts — a parallel `claude -p` call surfaces what went well, what to improve, and notable observations with transcript evidence
+- `--no-insights` flag on `check` to skip insights for speed
+- `--quiet` now implies `--no-insights` (no extra LLM call in hook mode)
+- `/test` skill for running the test suite
 
 ## [0.2.0] - 2026-02-15 (`12e688d`)
 
