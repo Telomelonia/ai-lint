@@ -5,7 +5,10 @@ import json
 import pytest
 
 from ai_lint.checker import (
+    _validate_insights,
     check_claude_installed,
+    extract_insights,
+    format_insights,
     format_report_markdown,
     format_verdicts,
     run_check,
@@ -205,3 +208,121 @@ class TestFormatReportMarkdown:
     def test_empty_sessions(self):
         report = format_report_markdown([])
         assert "Sessions checked: 0" in report
+
+
+class TestExtractInsights:
+    def test_valid_response(self, monkeypatch, sample_insights):
+        monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
+        inner = sample_insights
+
+        class FakeResult:
+            returncode = 0
+            stdout = json.dumps(inner)
+            stderr = ""
+
+        monkeypatch.setattr("subprocess.run", lambda *a, **kw: FakeResult())
+        result = extract_insights("transcript", "policy")
+        assert result["what_went_well"][0]["pattern"] == "Clear problem description"
+
+    def test_wrapper_extraction(self, monkeypatch, sample_insights):
+        monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
+        wrapper = {"result": json.dumps(sample_insights)}
+
+        class FakeResult:
+            returncode = 0
+            stdout = json.dumps(wrapper)
+            stderr = ""
+
+        monkeypatch.setattr("subprocess.run", lambda *a, **kw: FakeResult())
+        result = extract_insights("transcript", "policy")
+        assert len(result["what_went_well"]) == 1
+
+    def test_fence_stripping(self, monkeypatch, sample_insights):
+        monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
+        fenced = "```json\n" + json.dumps(sample_insights) + "\n```"
+
+        class FakeResult:
+            returncode = 0
+            stdout = fenced
+            stderr = ""
+
+        monkeypatch.setattr("subprocess.run", lambda *a, **kw: FakeResult())
+        result = extract_insights("transcript", "policy")
+        assert len(result["what_to_improve"]) == 1
+
+    def test_invalid_json_raises(self, monkeypatch):
+        monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
+
+        class FakeResult:
+            returncode = 0
+            stdout = "not json at all"
+            stderr = ""
+
+        monkeypatch.setattr("subprocess.run", lambda *a, **kw: FakeResult())
+        with pytest.raises(RuntimeError, match="Failed to parse"):
+            extract_insights("transcript", "policy")
+
+    def test_missing_claude_exits(self, monkeypatch):
+        monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: False)
+        with pytest.raises(SystemExit):
+            extract_insights("transcript", "policy")
+
+
+class TestValidateInsights:
+    def test_valid_data_passthrough(self, sample_insights):
+        result = _validate_insights(sample_insights)
+        assert result == sample_insights
+
+    def test_missing_keys_filled(self):
+        result = _validate_insights({})
+        assert result == {"what_went_well": [], "what_to_improve": [], "notable": []}
+
+    def test_malformed_items_filtered(self):
+        raw = {
+            "what_went_well": [
+                {"pattern": "Good", "evidence": "Proof"},
+                {"pattern": "Missing evidence"},  # no evidence key
+                "not a dict",
+            ],
+            "what_to_improve": [],
+            "notable": [
+                {"observation": "Interesting", "evidence": "Proof"},
+                {"wrong_key": "Bad"},
+            ],
+        }
+        result = _validate_insights(raw)
+        assert len(result["what_went_well"]) == 1
+        assert result["what_went_well"][0]["pattern"] == "Good"
+        assert len(result["notable"]) == 1
+
+    def test_non_dict_returns_defaults(self):
+        result = _validate_insights("not a dict")
+        assert result == {"what_went_well": [], "what_to_improve": [], "notable": []}
+
+
+class TestFormatInsights:
+    def test_full_output(self, sample_insights):
+        output = format_insights(sample_insights)
+        assert "What went well:" in output
+        assert "Clear problem description" in output
+        assert "What to improve:" in output
+        assert "No testing discussed" in output
+
+    def test_empty_insights(self):
+        output = format_insights({"what_went_well": [], "what_to_improve": [], "notable": []})
+        assert "What went well:" not in output
+        assert "What to improve:" not in output
+
+    def test_header_present(self, sample_insights):
+        output = format_insights(sample_insights)
+        assert "--- Session Insights ---" in output
+
+    def test_notable_section(self):
+        insights = {
+            "what_went_well": [],
+            "what_to_improve": [],
+            "notable": [{"observation": "Used unusual pattern", "evidence": "Line 42"}],
+        }
+        output = format_insights(insights)
+        assert "Notable:" in output
+        assert "Used unusual pattern" in output

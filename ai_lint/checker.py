@@ -108,6 +108,154 @@ TRANSCRIPT:
     return verdicts
 
 
+INSIGHT_SYSTEM_PROMPT = """You are a development coach reviewing an AI coding session transcript. Your goal is to provide actionable, evidence-based feedback on how the session went.
+
+Focus on:
+- Interaction patterns: How did the developer and AI collaborate?
+- Decision quality: Were good choices made about scope, approach, and delegation?
+- Efficiency: Was time spent well? Were there unnecessary detours?
+- Process: Was there testing, review, or structured thinking?
+
+Every insight MUST cite specific evidence from the transcript.
+
+Return ONLY valid JSON — no markdown fences, no commentary outside the JSON.
+
+Response format:
+{
+  "what_went_well": [
+    {"pattern": "Short description of positive pattern", "evidence": "Specific quote or reference from transcript"}
+  ],
+  "what_to_improve": [
+    {"pattern": "Short description of improvement area", "evidence": "Specific quote or reference from transcript"}
+  ],
+  "notable": [
+    {"observation": "Interesting observation", "evidence": "Specific quote or reference from transcript"}
+  ]
+}
+
+Guidelines:
+- Provide 1-3 items per section. Empty sections are fine if nothing applies.
+- Be specific and constructive, not generic.
+- Base everything on what actually happened in the transcript."""
+
+
+def extract_insights(transcript: str, policy: str) -> dict:
+    """Send transcript + policy to claude -p and return parsed insights.
+
+    Raises RuntimeError if claude CLI fails or response is unparseable.
+    Returns dict with 'what_went_well', 'what_to_improve', 'notable' keys.
+    """
+    if not check_claude_installed():
+        print(
+            "Error: 'claude' CLI not found.\n"
+            "Install Claude Code: https://claude.ai/install.sh",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    prompt = f"""{INSIGHT_SYSTEM_PROMPT}
+
+---
+POLICY (for context on what the team values):
+{policy}
+
+---
+TRANSCRIPT:
+{transcript}"""
+
+    try:
+        result = subprocess.run(
+            ["claude", "-p", "--output-format", "json"],
+            input=prompt,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("claude -p timed out after 120 seconds")
+
+    if result.returncode != 0:
+        raise RuntimeError(f"claude -p failed:\n{result.stderr}")
+
+    raw = result.stdout.strip()
+    try:
+        wrapper = json.loads(raw)
+        if isinstance(wrapper, dict) and "result" in wrapper:
+            raw = wrapper["result"].strip()
+    except json.JSONDecodeError:
+        pass
+
+    fence_match = re.search(r"```(?:json)?\s*\n(.*?)\n\s*```", raw, re.DOTALL)
+    if fence_match:
+        raw = fence_match.group(1)
+
+    try:
+        insights = json.loads(raw)
+    except json.JSONDecodeError:
+        raise RuntimeError(
+            f"Failed to parse insights response as JSON.\nRaw output:\n{raw}"
+        )
+
+    return _validate_insights(insights)
+
+
+def _validate_insights(raw: dict) -> dict:
+    """Validate and normalize insights structure, filling defaults for missing fields."""
+    result = {
+        "what_went_well": [],
+        "what_to_improve": [],
+        "notable": [],
+    }
+
+    if not isinstance(raw, dict):
+        return result
+
+    for item in raw.get("what_went_well", []):
+        if isinstance(item, dict) and "pattern" in item and "evidence" in item:
+            result["what_went_well"].append(item)
+
+    for item in raw.get("what_to_improve", []):
+        if isinstance(item, dict) and "pattern" in item and "evidence" in item:
+            result["what_to_improve"].append(item)
+
+    for item in raw.get("notable", []):
+        if isinstance(item, dict) and "observation" in item and "evidence" in item:
+            result["notable"].append(item)
+
+    return result
+
+
+def format_insights(insights: dict) -> str:
+    """Format insights dict into a readable terminal string."""
+    lines = ["\n--- Session Insights ---\n"]
+
+    well = insights.get("what_went_well", [])
+    if well:
+        lines.append("What went well:")
+        for item in well:
+            lines.append(f"  - {item['pattern']}")
+            lines.append(f"    Evidence: {item['evidence']}")
+        lines.append("")
+
+    improve = insights.get("what_to_improve", [])
+    if improve:
+        lines.append("What to improve:")
+        for item in improve:
+            lines.append(f"  - {item['pattern']}")
+            lines.append(f"    Evidence: {item['evidence']}")
+        lines.append("")
+
+    notable = insights.get("notable", [])
+    if notable:
+        lines.append("Notable:")
+        for item in notable:
+            lines.append(f"  - {item['observation']}")
+            lines.append(f"    Evidence: {item['evidence']}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 def _group_by_category(verdicts: list[dict]) -> list[tuple[str, list[dict]]]:
     """Group verdicts by category, preserving order of first appearance."""
     groups: dict[str, list[dict]] = {}

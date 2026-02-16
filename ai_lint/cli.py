@@ -1,6 +1,7 @@
 """Click CLI for ai-lint."""
 
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
@@ -8,6 +9,8 @@ import click
 
 from ai_lint.checker import (
     check_claude_installed,
+    extract_insights,
+    format_insights,
     format_report_markdown,
     format_verdicts,
     run_check,
@@ -87,7 +90,8 @@ def init():
 @cli.command()
 @click.option("--last", is_flag=True, help="Check the most recent session without prompting.")
 @click.option("--quiet", is_flag=True, help="Minimal output (for hook usage).")
-def check(last, quiet):
+@click.option("--no-insights", is_flag=True, help="Skip session insights.")
+def check(last, quiet, no_insights):
     """Pick a session and check it against your policy."""
     if not policy_exists():
         click.echo("No policy found. Run 'ai-lint init' first.")
@@ -129,15 +133,36 @@ def check(last, quiet):
     if not quiet:
         click.echo(f"Checking {len(selected.messages)} messages against policy...")
 
-    try:
-        with Spinner("Analyzing with claude..."):
-            result = run_check(transcript, policy)
-    except RuntimeError as e:
-        click.echo(f"Error: {e}", err=True)
-        sys.exit(1)
+    skip_insights = quiet or no_insights
+
+    if skip_insights:
+        try:
+            with Spinner("Analyzing with claude..."):
+                result = run_check(transcript, policy)
+        except RuntimeError as e:
+            click.echo(f"Error: {e}", err=True)
+            sys.exit(1)
+        insights = None
+    else:
+        try:
+            with Spinner("Analyzing with claude..."):
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    verdict_future = pool.submit(run_check, transcript, policy)
+                    insight_future = pool.submit(extract_insights, transcript, policy)
+                    result = verdict_future.result()
+                    try:
+                        insights = insight_future.result()
+                    except Exception:
+                        insights = None
+        except RuntimeError as e:
+            click.echo(f"Error: {e}", err=True)
+            sys.exit(1)
 
     output = format_verdicts(result)
     click.echo(output)
+
+    if insights:
+        click.echo(format_insights(insights))
 
 
 @cli.command()

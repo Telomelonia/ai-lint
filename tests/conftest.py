@@ -122,3 +122,17 @@ def sample_verdicts():
         ],
         "summary": "Mostly compliant session.",
     }
+
+
+@pytest.fixture()
+def sample_insights():
+    """Return a dict matching the extract_insights output format."""
+    return {
+        "what_went_well": [
+            {"pattern": "Clear problem description", "evidence": "User described expected vs actual behavior"},
+        ],
+        "what_to_improve": [
+            {"pattern": "No testing discussed", "evidence": "Files written with no test run"},
+        ],
+        "notable": [],
+    }

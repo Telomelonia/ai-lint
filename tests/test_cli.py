@@ -137,6 +137,59 @@ class TestCheck:
         assert result.exit_code == 0
         assert "no messages" in result.output
 
+    def test_insights_displayed(self, runner, full_setup, monkeypatch, sample_insights):
+        fake_result = {
+            "verdicts": [{"rule": "R1", "verdict": "PASS", "reasoning": "ok"}],
+            "summary": "good",
+        }
+        monkeypatch.setattr("ai_lint.cli.run_check", lambda t, p: fake_result)
+        monkeypatch.setattr("ai_lint.cli.extract_insights", lambda t, p: sample_insights)
+        result = runner.invoke(cli, ["check", "--last"])
+        assert result.exit_code == 0
+        assert "PASS" in result.output
+        assert "Session Insights" in result.output
+        assert "Clear problem description" in result.output
+
+    def test_no_insights_flag(self, runner, full_setup, monkeypatch):
+        fake_result = {
+            "verdicts": [{"rule": "R1", "verdict": "PASS", "reasoning": "ok"}],
+            "summary": "good",
+        }
+        monkeypatch.setattr("ai_lint.cli.run_check", lambda t, p: fake_result)
+        # extract_insights should not be called; if it is, it would fail
+        monkeypatch.setattr("ai_lint.cli.extract_insights", lambda t, p: (_ for _ in ()).throw(AssertionError("should not be called")))
+        result = runner.invoke(cli, ["check", "--last", "--no-insights"])
+        assert result.exit_code == 0
+        assert "PASS" in result.output
+        assert "Session Insights" not in result.output
+
+    def test_quiet_skips_insights(self, runner, full_setup, monkeypatch):
+        fake_result = {
+            "verdicts": [{"rule": "R1", "verdict": "PASS", "reasoning": "ok"}],
+            "summary": "good",
+        }
+        monkeypatch.setattr("ai_lint.cli.run_check", lambda t, p: fake_result)
+        monkeypatch.setattr("ai_lint.cli.extract_insights", lambda t, p: (_ for _ in ()).throw(AssertionError("should not be called")))
+        result = runner.invoke(cli, ["check", "--last", "--quiet"])
+        assert result.exit_code == 0
+        assert "Session Insights" not in result.output
+
+    def test_insight_failure_still_shows_verdicts(self, runner, full_setup, monkeypatch):
+        fake_result = {
+            "verdicts": [{"rule": "R1", "verdict": "PASS", "reasoning": "ok"}],
+            "summary": "good",
+        }
+        monkeypatch.setattr("ai_lint.cli.run_check", lambda t, p: fake_result)
+
+        def fail_insights(t, p):
+            raise RuntimeError("insight LLM failed")
+
+        monkeypatch.setattr("ai_lint.cli.extract_insights", fail_insights)
+        result = runner.invoke(cli, ["check", "--last"])
+        assert result.exit_code == 0
+        assert "PASS" in result.output
+        assert "Session Insights" not in result.output
+
 
 # -- report --
 
