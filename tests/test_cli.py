@@ -90,12 +90,13 @@ class TestCheck:
         assert result.exit_code == 1
         assert "No sessions found" in result.output
 
-    def test_last_flag(self, runner, full_setup, monkeypatch):
+    def test_last_flag(self, runner, full_setup, monkeypatch, sample_insights):
         fake_result = {
             "verdicts": [{"rule": "R1", "verdict": "PASS", "reasoning": "ok"}],
             "summary": "good",
         }
         monkeypatch.setattr("ai_lint.cli.run_check", lambda t, p: fake_result)
+        monkeypatch.setattr("ai_lint.cli.extract_insights", lambda t, p: sample_insights)
         result = runner.invoke(cli, ["check", "--last"])
         assert result.exit_code == 0
         assert "PASS" in result.output
@@ -110,12 +111,13 @@ class TestCheck:
         assert result.exit_code == 0
         assert "Parsing session" not in result.output
 
-    def test_session_picker(self, runner, full_setup, monkeypatch):
+    def test_session_picker(self, runner, full_setup, monkeypatch, sample_insights):
         fake_result = {
             "verdicts": [{"rule": "R1", "verdict": "PASS", "reasoning": "ok"}],
             "summary": "good",
         }
         monkeypatch.setattr("ai_lint.cli.run_check", lambda t, p: fake_result)
+        monkeypatch.setattr("ai_lint.cli.extract_insights", lambda t, p: sample_insights)
         result = runner.invoke(cli, ["check"], input="1\n")
         assert result.exit_code == 0
         assert "Recent sessions" in result.output
