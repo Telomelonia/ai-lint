@@ -289,7 +289,9 @@ class TestHook:
 class TestVersion:
     def test_version(self, runner):
         result = runner.invoke(cli, ["--version"])
-        assert "0.2.0" in result.output
+        from ai_lint import __version__
+
+        assert __version__ in result.output
 
 
 # -- help --

@@ -4,6 +4,8 @@ All notable changes to ai-lint will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-02-17
+
 ### Fixed
 - JSON parsing failure when `claude -p` wraps response in `{"result": "\n\n```json...```"}` — inner result now `.strip()`ed before fence extraction
 - JSON parsing failure when LLM adds prose before the fenced JSON block — fence extraction now uses regex to find fenced JSON anywhere in the response
@@ -14,7 +16,6 @@ All notable changes to ai-lint will be documented in this file.
 - **Per-session insights** alongside compliance verdicts — a parallel `claude -p` call surfaces what went well, what to improve, and notable observations with transcript evidence
 - `--no-insights` flag on `check` to skip insights for speed
 - `--quiet` now implies `--no-insights` (no extra LLM call in hook mode)
-- `/test` skill for running the test suite
 
 ## [0.2.0] - 2026-02-15 (`12e688d`)
 
