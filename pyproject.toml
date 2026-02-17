@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-lint"
-version = "0.3.3"
+version = "0.3.4"
 description = "Check AI coding session compliance against user-defined policies"
 readme = "README.md"
 license = "MIT"

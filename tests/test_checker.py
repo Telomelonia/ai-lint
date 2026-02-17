@@ -94,6 +94,19 @@ class TestCallClaude:
         _call_claude("prompt")
         assert "--no-session-persistence" in captured["args"]
 
+    def test_disable_hooks_flag(self, monkeypatch, make_fake_result):
+        """claude -p is called with --settings to disable hooks and prevent recursive calls."""
+        monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
+        captured = {}
+        def fake_run(*args, **kwargs):
+            captured["args"] = args[0]
+            return make_fake_result(stdout='{"key": "value"}')
+        monkeypatch.setattr("subprocess.run", fake_run)
+        _call_claude("prompt")
+        assert "--settings" in captured["args"]
+        settings_idx = captured["args"].index("--settings")
+        assert '{"disableAllHooks": true}' in captured["args"][settings_idx + 1]
+
     def test_fence_no_newline_before_close(self, monkeypatch, make_fake_result):
         """Fence extraction works when closing ``` has no leading newline."""
         monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)

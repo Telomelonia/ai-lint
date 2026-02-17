@@ -60,7 +60,8 @@ def _call_claude(prompt: str) -> dict:
 
     try:
         result = subprocess.run(
-            ["claude", "-p", "--output-format", "json", "--no-session-persistence"],
+            ["claude", "-p", "--output-format", "json", "--no-session-persistence",
+             "--settings", '{"disableAllHooks": true}'],
             input=prompt,
             capture_output=True,
             text=True,

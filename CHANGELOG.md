@@ -5,6 +5,7 @@ All notable changes to ai-lint will be documented in this file.
 ## [Unreleased]
 
 ### Fixed
+- Hook no longer triggers recursive `claude -p` calls causing repeated report output — internal LLM calls now pass `--settings '{"disableAllHooks": true}'` to prevent hook re-firing
 - ai-lint's own `claude -p` sessions no longer pollute the session list — `--no-session-persistence` prevents session file creation, and a defensive filter skips any existing ai-lint sessions
 - JSON parsing failure when LLM returns fenced JSON without trailing newline — fence regex now handles missing newlines, and a `{...}` extraction fallback catches remaining edge cases
 - Hook no longer spams "Your report is getting ready..." repeatedly in the terminal — quiet mode now runs silently with no spinner or status messages until results are ready
