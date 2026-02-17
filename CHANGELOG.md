@@ -4,10 +4,13 @@ All notable changes to ai-lint will be documented in this file.
 
 ## [Unreleased]
 
-### Changed
-- Compact `check` output: dropped category headers, suppressed reasoning for PASS/SKIP verdicts, show FAIL reasoning inline after dash, replaced verbose results line with `X/Y passed` tally, removed summary paragraph
+### Fixed
+- ai-lint's own `claude -p` sessions no longer pollute the session list — `--no-session-persistence` prevents session file creation, and a defensive filter skips any existing ai-lint sessions
 
 ## [0.3.0] - 2026-02-17
+
+### Changed
+- Compact `check` output: dropped category headers, suppressed reasoning for PASS/SKIP verdicts, show FAIL reasoning inline after dash, replaced verbose results line with `X/Y passed` tally, removed summary paragraph
 
 ### Fixed
 - JSON parsing failure when `claude -p` wraps response in `{"result": "\n\n```json...```"}` — inner result now `.strip()`ed before fence extraction

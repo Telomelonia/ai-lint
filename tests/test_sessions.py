@@ -10,6 +10,7 @@ from ai_lint.sessions import (
     Message,
     Session,
     _extract_text,
+    _is_ai_lint_session,
     discover_sessions,
     format_transcript,
     parse_session,
@@ -159,6 +160,132 @@ class TestDiscoverSessions:
             (d / "s.jsonl").write_text("{}\n")
         sessions = discover_sessions()
         assert len(sessions) == 2
+
+
+# -- _is_ai_lint_session / filtering --
+
+
+class TestIsAiLintSession:
+    def _write_session(self, directory, filename, content):
+        """Helper to write a JSONL session with a single user message."""
+        entry = {
+            "type": "user",
+            "timestamp": "2025-01-01T00:00:00Z",
+            "message": {"role": "user", "content": content},
+        }
+        path = directory / filename
+        path.write_text(json.dumps(entry) + "\n")
+        return path
+
+    def test_checker_prompt_detected(self, tmp_path):
+        path = self._write_session(
+            tmp_path, "s.jsonl",
+            "You are a compliance auditor for AI coding sessions. Evaluate...",
+        )
+        assert _is_ai_lint_session(path) is True
+
+    def test_insight_prompt_detected(self, tmp_path):
+        path = self._write_session(
+            tmp_path, "s.jsonl",
+            "You are a development coach reviewing an AI coding session transcript. Focus on...",
+        )
+        assert _is_ai_lint_session(path) is True
+
+    def test_normal_session_not_filtered(self, tmp_path):
+        path = self._write_session(
+            tmp_path, "s.jsonl",
+            "Help me refactor the auth module",
+        )
+        assert _is_ai_lint_session(path) is False
+
+    def test_empty_file(self, tmp_path):
+        path = tmp_path / "empty.jsonl"
+        path.write_text("")
+        assert _is_ai_lint_session(path) is False
+
+    def test_no_user_message(self, tmp_path):
+        entry = {
+            "type": "system",
+            "timestamp": "2025-01-01T00:00:00Z",
+            "message": {"role": "system", "content": "Session started"},
+        }
+        path = tmp_path / "s.jsonl"
+        path.write_text(json.dumps(entry) + "\n")
+        assert _is_ai_lint_session(path) is False
+
+    def test_list_content_format(self, tmp_path):
+        entry = {
+            "type": "user",
+            "timestamp": "2025-01-01T00:00:00Z",
+            "message": {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "You are a compliance auditor for AI coding sessions. Evaluate..."},
+                ],
+            },
+        }
+        path = tmp_path / "s.jsonl"
+        path.write_text(json.dumps(entry) + "\n")
+        assert _is_ai_lint_session(path) is True
+
+    def test_nonexistent_file(self, tmp_path):
+        path = tmp_path / "does_not_exist.jsonl"
+        assert _is_ai_lint_session(path) is False
+
+
+class TestDiscoverSessionsFiltersAiLint:
+    def test_checker_sessions_filtered(self, claude_projects_dir):
+        proj = claude_projects_dir / "project"
+        proj.mkdir()
+        # ai-lint checker session
+        checker_entry = {
+            "type": "user",
+            "timestamp": "2025-01-01T00:00:00Z",
+            "message": {
+                "role": "user",
+                "content": "You are a compliance auditor for AI coding sessions. Evaluate...",
+            },
+        }
+        (proj / "checker.jsonl").write_text(json.dumps(checker_entry) + "\n")
+        # Normal session
+        normal_entry = {
+            "type": "user",
+            "timestamp": "2025-01-01T00:00:00Z",
+            "message": {"role": "user", "content": "Help me fix a bug"},
+        }
+        (proj / "normal.jsonl").write_text(json.dumps(normal_entry) + "\n")
+        sessions = discover_sessions()
+        ids = [s.session_id for s in sessions]
+        assert "checker" not in ids
+        assert "normal" in ids
+
+    def test_insight_sessions_filtered(self, claude_projects_dir):
+        proj = claude_projects_dir / "project"
+        proj.mkdir()
+        insight_entry = {
+            "type": "user",
+            "timestamp": "2025-01-01T00:00:00Z",
+            "message": {
+                "role": "user",
+                "content": "You are a development coach reviewing an AI coding session transcript. Focus on...",
+            },
+        }
+        (proj / "insight.jsonl").write_text(json.dumps(insight_entry) + "\n")
+        sessions = discover_sessions()
+        assert len(sessions) == 0
+
+    def test_normal_sessions_not_filtered(self, claude_projects_dir):
+        proj = claude_projects_dir / "project"
+        proj.mkdir()
+        normal_entry = {
+            "type": "user",
+            "timestamp": "2025-01-01T00:00:00Z",
+            "message": {"role": "user", "content": "Help me refactor the auth module"},
+        }
+        (proj / "normal.jsonl").write_text(json.dumps(normal_entry) + "\n")
+        sessions = discover_sessions()
+        assert len(sessions) == 1
+        assert sessions[0].session_id == "normal"
 
 
 # -- parse_session --

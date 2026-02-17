@@ -60,7 +60,7 @@ def _call_claude(prompt: str) -> dict:
 
     try:
         result = subprocess.run(
-            ["claude", "-p", "--output-format", "json"],
+            ["claude", "-p", "--output-format", "json", "--no-session-persistence"],
             input=prompt,
             capture_output=True,
             text=True,

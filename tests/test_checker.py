@@ -83,6 +83,17 @@ class TestCallClaude:
         monkeypatch.setattr("subprocess.run", lambda *a, **kw: fake)
         assert _call_claude("prompt") == inner
 
+    def test_no_session_persistence_flag(self, monkeypatch, make_fake_result):
+        """claude -p is called with --no-session-persistence to avoid polluting session list."""
+        monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
+        captured = {}
+        def fake_run(*args, **kwargs):
+            captured["args"] = args[0]
+            return make_fake_result(stdout='{"key": "value"}')
+        monkeypatch.setattr("subprocess.run", fake_run)
+        _call_claude("prompt")
+        assert "--no-session-persistence" in captured["args"]
+
     def test_invalid_json_raises(self, monkeypatch, make_fake_result):
         monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
         fake = make_fake_result(stdout="not json at all")

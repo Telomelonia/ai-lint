@@ -7,6 +7,13 @@ from pathlib import Path
 
 CLAUDE_PROJECTS_DIR = Path.home() / ".claude" / "projects"
 
+# Prompt prefixes used by ai-lint's own claude -p calls (checker.py).
+# Sessions starting with these are ai-lint internal sessions, not user work.
+_AI_LINT_PROMPT_PREFIXES = (
+    "You are a compliance auditor for AI coding sessions.",
+    "You are a development coach reviewing an AI coding session transcript.",
+)
+
 
 @dataclass
 class Message:
@@ -50,6 +57,41 @@ class Session:
         return " | ".join(parts) if parts else self.session_id[:8]
 
 
+def _is_ai_lint_session(path: Path) -> bool:
+    """Check if a JSONL session file is an ai-lint internal session.
+
+    Reads the first user message and checks if it starts with a known
+    ai-lint prompt prefix (compliance check or insights extraction).
+    """
+    try:
+        with open(path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if entry.get("type") != "user":
+                    continue
+                content = entry.get("message", {}).get("content", "")
+                if isinstance(content, list):
+                    # Extract text from list-of-blocks format
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "text":
+                            content = block["text"]
+                            break
+                    else:
+                        return False
+                if isinstance(content, str):
+                    return any(content.startswith(prefix) for prefix in _AI_LINT_PROMPT_PREFIXES)
+                return False
+    except (OSError, ValueError):
+        return False
+    return False
+
+
 def discover_sessions() -> list[Session]:
     """Find all session JSONL files under ~/.claude/projects/."""
     if not CLAUDE_PROJECTS_DIR.exists():
@@ -59,6 +101,9 @@ def discover_sessions() -> list[Session]:
     for jsonl_path in sorted(CLAUDE_PROJECTS_DIR.rglob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True):
         # Skip subagent transcripts
         if "subagents" in jsonl_path.parts:
+            continue
+        # Skip ai-lint's own claude -p sessions
+        if _is_ai_lint_session(jsonl_path):
             continue
         # Project name from parent directory
         project_dir = jsonl_path.parent.name
