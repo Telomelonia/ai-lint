@@ -145,46 +145,50 @@ class TestExtractInsights:
 
 
 class TestFormatVerdicts:
-    def test_icons_and_counts(self, sample_verdicts):
+    def test_icons(self, sample_verdicts):
         output = format_verdicts(sample_verdicts)
         assert "[+] PASS" in output
         assert "[x] FAIL" in output
         assert "[-] SKIP" in output
-        assert "3 passed" in output
-        assert "1 failed" in output
-        assert "1 skipped" in output
 
-    def test_category_headers(self, sample_verdicts):
+    def test_compact_tally(self, sample_verdicts):
         output = format_verdicts(sample_verdicts)
-        assert "Security" in output
-        assert "Developer Engagement" in output
-        assert "Process Discipline" in output
+        assert "3/5 passed" in output
 
-    def test_includes_summary(self, sample_verdicts):
+    def test_no_category_headers(self, sample_verdicts):
         output = format_verdicts(sample_verdicts)
-        assert "Mostly compliant" in output
+        lines = output.split("\n")
+        # Category names should not appear as standalone header lines
+        header_lines = [l.strip() for l in lines if l.strip() in ("Security", "Developer Engagement", "Process Discipline")]
+        assert header_lines == []
 
-    def test_includes_reasoning(self, sample_verdicts):
+    def test_no_summary(self, sample_verdicts):
         output = format_verdicts(sample_verdicts)
-        assert "Developer showed understanding" in output
-        assert "No secrets found" in output
+        assert "Summary:" not in output
+        assert "Mostly compliant" not in output
+
+    def test_pass_no_reasoning(self, sample_verdicts):
+        output = format_verdicts(sample_verdicts)
+        assert "No secrets found" not in output
+        assert "Developer showed understanding" not in output
+
+    def test_fail_includes_reasoning(self, sample_verdicts):
+        output = format_verdicts(sample_verdicts)
+        assert "Developer did not review" in output
+        assert "[x] FAIL: Review before acceptance — Developer did not review." in output
 
     def test_empty_verdicts(self):
         output = format_verdicts({"verdicts": [], "summary": ""})
-        assert "0 passed" in output
+        assert "0/0 passed" in output
 
-    def test_no_summary(self):
-        output = format_verdicts({"verdicts": [], "summary": ""})
-        assert "Summary:" not in output
-
-    def test_missing_category_falls_back(self):
+    def test_missing_category_no_header(self):
         result = {
             "verdicts": [{"rule": "R1", "verdict": "PASS", "reasoning": "ok"}],
             "summary": "",
         }
         output = format_verdicts(result)
-        assert "General" in output
-        assert "[+] PASS" in output
+        assert "[+] PASS: R1" in output
+        assert "1/1 passed" in output
 
 
 class TestFormatReportMarkdown:

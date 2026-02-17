@@ -241,21 +241,17 @@ def format_verdicts(result: dict) -> str:
     lines = []
     verdicts = result.get("verdicts", [])
     counts = count_verdicts(verdicts)
+    total = counts["pass"] + counts["fail"] + counts["skip"]
 
-    for category, group in _group_by_category(verdicts):
-        lines.append(f"  {category}")
-        for v in group:
-            icon = {"PASS": "+", "FAIL": "x", "SKIP": "-"}.get(v["verdict"], "?")
+    for v in verdicts:
+        icon = {"PASS": "+", "FAIL": "x", "SKIP": "-"}.get(v["verdict"], "?")
+        if v["verdict"] == "FAIL":
+            lines.append(f"  [{icon}] {v['verdict']}: {v['rule']} — {v['reasoning']}")
+        else:
             lines.append(f"  [{icon}] {v['verdict']}: {v['rule']}")
-            lines.append(f"      {v['reasoning']}")
-        lines.append("")
 
-    lines.append(f"Results: {counts['pass']} passed, {counts['fail']} failed, {counts['skip']} skipped")
     lines.append("")
-
-    summary = result.get("summary", "")
-    if summary:
-        lines.append(f"Summary: {summary}")
+    lines.append(f"  {counts['pass']}/{total} passed")
 
     return "\n".join(lines)
 

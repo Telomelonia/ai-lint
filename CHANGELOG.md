@@ -4,6 +4,9 @@ All notable changes to ai-lint will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- Compact `check` output: dropped category headers, suppressed reasoning for PASS/SKIP verdicts, show FAIL reasoning inline after dash, replaced verbose results line with `X/Y passed` tally, removed summary paragraph
+
 ## [0.3.0] - 2026-02-17
 
 ### Fixed

@@ -41,6 +41,10 @@ pytest -v
 - Monkeypatch module-level constants (`CONFIG_DIR`, `CLAUDE_PROJECTS_DIR`, etc.) to temp dirs in tests
 - Use Click's `CliRunner` for CLI tests
 
+## Changelog
+- Every user-facing change must have a corresponding entry in `CHANGELOG.md` under `[Unreleased]`
+- Use Keep a Changelog format: `Added`, `Changed`, `Fixed`, `Removed`
+
 ## Key conventions
 - `PERSONAS` dict maps persona names to template filenames
 - Session discovery skips `subagents/` directories
