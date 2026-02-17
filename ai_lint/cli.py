@@ -195,6 +195,8 @@ def check(last, quiet, no_insights, tty):
         # Wrap output in a visual box for hook mode
         separator = "─" * 40
         _echo("", tty_file)
+        _echo("  Linting your last session...", tty_file)
+        _echo("", tty_file)
         _echo(separator, tty_file)
         _echo(f"  ai-lint report for session {selected.session_id[:8]}", tty_file)
         _echo("", tty_file)
@@ -202,6 +204,7 @@ def check(last, quiet, no_insights, tty):
         if insights:
             _echo(format_insights(insights), tty_file)
         _echo(separator, tty_file)
+        _echo("  Press Ctrl+C to dismiss", tty_file)
         _echo("", tty_file)
         tty_file.close()
     else:
