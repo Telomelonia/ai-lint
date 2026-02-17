@@ -7,6 +7,7 @@ All notable changes to ai-lint will be documented in this file.
 ## [0.3.8] - 2026-02-17
 
 ### Added
+- GitHub Actions workflow for manual PyPI publishing (`publish-pypi.yml`)
 - Loading spinner animation while `claude -p` runs (braille dot frames on stderr)
 - **Per-session insights** alongside compliance verdicts — a parallel `claude -p` call surfaces what went well, what to improve, and notable observations with transcript evidence
 - `--no-insights` flag on `check` to skip insights for speed
