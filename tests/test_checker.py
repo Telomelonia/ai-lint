@@ -5,6 +5,8 @@ import json
 import pytest
 
 from ai_lint.checker import (
+    ClaudeNotFoundError,
+    _call_claude,
     _validate_insights,
     check_claude_installed,
     extract_insights,
@@ -25,107 +27,121 @@ class TestCheckClaudeInstalled:
         assert check_claude_installed() is False
 
 
-class TestRunCheck:
-    def test_missing_claude_exits(self, monkeypatch):
+class TestCallClaude:
+    def test_missing_claude_raises(self, monkeypatch):
         monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: False)
-        with pytest.raises(SystemExit):
-            run_check("transcript", "policy")
+        with pytest.raises(ClaudeNotFoundError):
+            _call_claude("prompt")
 
-    def test_subprocess_failure_raises(self, monkeypatch):
+    def test_subprocess_failure_raises(self, monkeypatch, make_fake_result):
         monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
-
-        class FakeResult:
-            returncode = 1
-            stderr = "something went wrong"
-
-        monkeypatch.setattr("subprocess.run", lambda *a, **kw: FakeResult())
+        fake = make_fake_result(returncode=1, stderr="something went wrong")
+        monkeypatch.setattr("subprocess.run", lambda *a, **kw: fake)
         with pytest.raises(RuntimeError, match="claude -p failed"):
-            run_check("transcript", "policy")
+            _call_claude("prompt")
 
-    def test_json_wrapper_extraction(self, monkeypatch):
+    def test_json_wrapper_extraction(self, monkeypatch, make_fake_result):
         monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
-        inner = {"verdicts": [{"rule": "R1", "verdict": "PASS", "reasoning": "ok"}], "summary": "good"}
+        inner = {"key": "value"}
         wrapper = {"result": json.dumps(inner)}
+        fake = make_fake_result(stdout=json.dumps(wrapper))
+        monkeypatch.setattr("subprocess.run", lambda *a, **kw: fake)
+        assert _call_claude("prompt") == inner
 
-        class FakeResult:
-            returncode = 0
-            stdout = json.dumps(wrapper)
-            stderr = ""
-
-        monkeypatch.setattr("subprocess.run", lambda *a, **kw: FakeResult())
-        result = run_check("transcript", "policy")
-        assert result["verdicts"][0]["verdict"] == "PASS"
-
-    def test_direct_json(self, monkeypatch):
+    def test_direct_json(self, monkeypatch, make_fake_result):
         monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
-        data = {"verdicts": [{"rule": "R1", "verdict": "FAIL", "reasoning": "bad"}], "summary": "fail"}
+        data = {"key": "value"}
+        fake = make_fake_result(stdout=json.dumps(data))
+        monkeypatch.setattr("subprocess.run", lambda *a, **kw: fake)
+        assert _call_claude("prompt") == data
 
-        class FakeResult:
-            returncode = 0
-            stdout = json.dumps(data)
-            stderr = ""
-
-        monkeypatch.setattr("subprocess.run", lambda *a, **kw: FakeResult())
-        result = run_check("transcript", "policy")
-        assert result["verdicts"][0]["verdict"] == "FAIL"
-
-    def test_fence_stripping(self, monkeypatch):
+    def test_fence_stripping(self, monkeypatch, make_fake_result):
         monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
-        data = {"verdicts": [], "summary": "ok"}
+        data = {"key": "value"}
         fenced = "```json\n" + json.dumps(data) + "\n```"
+        fake = make_fake_result(stdout=fenced)
+        monkeypatch.setattr("subprocess.run", lambda *a, **kw: fake)
+        assert _call_claude("prompt") == data
 
-        class FakeResult:
-            returncode = 0
-            stdout = fenced
-            stderr = ""
-
-        monkeypatch.setattr("subprocess.run", lambda *a, **kw: FakeResult())
-        result = run_check("transcript", "policy")
-        assert result["summary"] == "ok"
-
-    def test_fence_stripping_after_wrapper_extraction(self, monkeypatch):
+    def test_fence_stripping_after_wrapper_extraction(self, monkeypatch, make_fake_result):
         """Fence stripping works when wrapper result has leading whitespace."""
         monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
-        inner = {"verdicts": [], "summary": "ok"}
+        inner = {"key": "value"}
         fenced = "\n\n```json\n" + json.dumps(inner) + "\n```"
         wrapper = {"result": fenced}
+        fake = make_fake_result(stdout=json.dumps(wrapper))
+        monkeypatch.setattr("subprocess.run", lambda *a, **kw: fake)
+        assert _call_claude("prompt") == inner
 
-        class FakeResult:
-            returncode = 0
-            stdout = json.dumps(wrapper)
-            stderr = ""
-
-        monkeypatch.setattr("subprocess.run", lambda *a, **kw: FakeResult())
-        result = run_check("transcript", "policy")
-        assert result["summary"] == "ok"
-
-    def test_fence_stripping_with_prose_before(self, monkeypatch):
+    def test_fence_stripping_with_prose_before(self, monkeypatch, make_fake_result):
         """Fence extraction works when LLM adds commentary before the JSON block."""
         monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
-        inner = {"verdicts": [], "summary": "ok"}
-        raw_text = "Let me analyze this session.\n\n```json\n" + json.dumps(inner) + "\n```"
+        inner = {"key": "value"}
+        raw_text = "Let me analyze this.\n\n```json\n" + json.dumps(inner) + "\n```"
         wrapper = {"result": raw_text}
+        fake = make_fake_result(stdout=json.dumps(wrapper))
+        monkeypatch.setattr("subprocess.run", lambda *a, **kw: fake)
+        assert _call_claude("prompt") == inner
 
-        class FakeResult:
-            returncode = 0
-            stdout = json.dumps(wrapper)
-            stderr = ""
-
-        monkeypatch.setattr("subprocess.run", lambda *a, **kw: FakeResult())
-        result = run_check("transcript", "policy")
-        assert result["summary"] == "ok"
-
-    def test_invalid_json_raises(self, monkeypatch):
+    def test_invalid_json_raises(self, monkeypatch, make_fake_result):
         monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
-
-        class FakeResult:
-            returncode = 0
-            stdout = "not json at all"
-            stderr = ""
-
-        monkeypatch.setattr("subprocess.run", lambda *a, **kw: FakeResult())
+        fake = make_fake_result(stdout="not json at all")
+        monkeypatch.setattr("subprocess.run", lambda *a, **kw: fake)
         with pytest.raises(RuntimeError, match="Failed to parse"):
+            _call_claude("prompt")
+
+
+class TestRunCheck:
+    def test_returns_call_claude_result(self, monkeypatch):
+        expected = {"verdicts": [{"rule": "R1", "verdict": "PASS", "reasoning": "ok"}], "summary": "good"}
+        monkeypatch.setattr("ai_lint.checker._call_claude", lambda prompt: expected)
+        assert run_check("transcript", "policy") == expected
+
+    def test_prompt_includes_transcript_and_policy(self, monkeypatch):
+        captured = {}
+        def fake_call(prompt):
+            captured["prompt"] = prompt
+            return {"verdicts": [], "summary": ""}
+        monkeypatch.setattr("ai_lint.checker._call_claude", fake_call)
+        run_check("my transcript", "my policy")
+        assert "my transcript" in captured["prompt"]
+        assert "my policy" in captured["prompt"]
+
+    def test_propagates_claude_not_found(self, monkeypatch):
+        def raise_not_found(prompt):
+            raise ClaudeNotFoundError("not found")
+        monkeypatch.setattr("ai_lint.checker._call_claude", raise_not_found)
+        with pytest.raises(ClaudeNotFoundError):
             run_check("transcript", "policy")
+
+
+class TestExtractInsights:
+    def test_returns_validated_result(self, monkeypatch, sample_insights):
+        monkeypatch.setattr("ai_lint.checker._call_claude", lambda prompt: sample_insights)
+        result = extract_insights("transcript", "policy")
+        assert result["what_went_well"][0]["pattern"] == "Clear problem description"
+
+    def test_prompt_includes_transcript_and_policy(self, monkeypatch):
+        captured = {}
+        def fake_call(prompt):
+            captured["prompt"] = prompt
+            return {"what_went_well": [], "what_to_improve": [], "notable": []}
+        monkeypatch.setattr("ai_lint.checker._call_claude", fake_call)
+        extract_insights("my transcript", "my policy")
+        assert "my transcript" in captured["prompt"]
+        assert "my policy" in captured["prompt"]
+
+    def test_validates_malformed_response(self, monkeypatch):
+        monkeypatch.setattr("ai_lint.checker._call_claude", lambda prompt: {"bad_key": 123})
+        result = extract_insights("transcript", "policy")
+        assert result == {"what_went_well": [], "what_to_improve": [], "notable": []}
+
+    def test_propagates_claude_not_found(self, monkeypatch):
+        def raise_not_found(prompt):
+            raise ClaudeNotFoundError("not found")
+        monkeypatch.setattr("ai_lint.checker._call_claude", raise_not_found)
+        with pytest.raises(ClaudeNotFoundError):
+            extract_insights("transcript", "policy")
 
 
 class TestFormatVerdicts:
@@ -208,64 +224,6 @@ class TestFormatReportMarkdown:
     def test_empty_sessions(self):
         report = format_report_markdown([])
         assert "Sessions checked: 0" in report
-
-
-class TestExtractInsights:
-    def test_valid_response(self, monkeypatch, sample_insights):
-        monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
-        inner = sample_insights
-
-        class FakeResult:
-            returncode = 0
-            stdout = json.dumps(inner)
-            stderr = ""
-
-        monkeypatch.setattr("subprocess.run", lambda *a, **kw: FakeResult())
-        result = extract_insights("transcript", "policy")
-        assert result["what_went_well"][0]["pattern"] == "Clear problem description"
-
-    def test_wrapper_extraction(self, monkeypatch, sample_insights):
-        monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
-        wrapper = {"result": json.dumps(sample_insights)}
-
-        class FakeResult:
-            returncode = 0
-            stdout = json.dumps(wrapper)
-            stderr = ""
-
-        monkeypatch.setattr("subprocess.run", lambda *a, **kw: FakeResult())
-        result = extract_insights("transcript", "policy")
-        assert len(result["what_went_well"]) == 1
-
-    def test_fence_stripping(self, monkeypatch, sample_insights):
-        monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
-        fenced = "```json\n" + json.dumps(sample_insights) + "\n```"
-
-        class FakeResult:
-            returncode = 0
-            stdout = fenced
-            stderr = ""
-
-        monkeypatch.setattr("subprocess.run", lambda *a, **kw: FakeResult())
-        result = extract_insights("transcript", "policy")
-        assert len(result["what_to_improve"]) == 1
-
-    def test_invalid_json_raises(self, monkeypatch):
-        monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
-
-        class FakeResult:
-            returncode = 0
-            stdout = "not json at all"
-            stderr = ""
-
-        monkeypatch.setattr("subprocess.run", lambda *a, **kw: FakeResult())
-        with pytest.raises(RuntimeError, match="Failed to parse"):
-            extract_insights("transcript", "policy")
-
-    def test_missing_claude_exits(self, monkeypatch):
-        monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: False)
-        with pytest.raises(SystemExit):
-            extract_insights("transcript", "policy")
 
 
 class TestValidateInsights:

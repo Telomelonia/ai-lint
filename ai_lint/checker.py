@@ -4,7 +4,10 @@ import json
 import re
 import shutil
 import subprocess
-import sys
+
+
+class ClaudeNotFoundError(RuntimeError):
+    """Raised when the claude CLI is not installed."""
 
 
 SYSTEM_PROMPT = """You are a compliance auditor for AI coding sessions. You will receive a session transcript and a policy document organized into sections (e.g., Security, Developer Engagement, Process Discipline).
@@ -44,29 +47,16 @@ def check_claude_installed() -> bool:
     return shutil.which("claude") is not None
 
 
-def run_check(transcript: str, policy: str) -> dict:
-    """Send transcript + policy to claude -p and return parsed verdicts.
+def _call_claude(prompt: str) -> dict:
+    """Send a prompt to claude -p and return parsed JSON response.
 
-    Raises RuntimeError if claude CLI fails.
-    Returns dict with 'verdicts' and 'summary' keys.
+    Raises ClaudeNotFoundError if claude CLI is not installed.
+    Raises RuntimeError if claude CLI fails or response is unparseable.
     """
     if not check_claude_installed():
-        print(
-            "Error: 'claude' CLI not found.\n"
-            "Install Claude Code: https://claude.ai/install.sh",
-            file=sys.stderr,
+        raise ClaudeNotFoundError(
+            "'claude' CLI not found. Install Claude Code: https://claude.ai/install.sh"
         )
-        sys.exit(1)
-
-    prompt = f"""{SYSTEM_PROMPT}
-
----
-POLICY:
-{policy}
-
----
-TRANSCRIPT:
-{transcript}"""
 
     try:
         result = subprocess.run(
@@ -82,30 +72,43 @@ TRANSCRIPT:
     if result.returncode != 0:
         raise RuntimeError(f"claude -p failed:\n{result.stderr}")
 
-    # claude --output-format json wraps the response in a JSON object
-    # with a "result" field containing the text response
     raw = result.stdout.strip()
     try:
         wrapper = json.loads(raw)
-        # If claude returned structured output, extract the text result
         if isinstance(wrapper, dict) and "result" in wrapper:
             raw = wrapper["result"].strip()
     except json.JSONDecodeError:
         pass
 
-    # Extract JSON from markdown code fences anywhere in the response
     fence_match = re.search(r"```(?:json)?\s*\n(.*?)\n\s*```", raw, re.DOTALL)
     if fence_match:
         raw = fence_match.group(1)
 
     try:
-        verdicts = json.loads(raw)
+        return json.loads(raw)
     except json.JSONDecodeError:
         raise RuntimeError(
             f"Failed to parse LLM response as JSON.\nRaw output:\n{raw}"
         )
 
-    return verdicts
+
+def run_check(transcript: str, policy: str) -> dict:
+    """Send transcript + policy to claude -p and return parsed verdicts.
+
+    Raises ClaudeNotFoundError if claude CLI is not installed.
+    Raises RuntimeError if claude CLI fails.
+    Returns dict with 'verdicts' and 'summary' keys.
+    """
+    prompt = f"""{SYSTEM_PROMPT}
+
+---
+POLICY:
+{policy}
+
+---
+TRANSCRIPT:
+{transcript}"""
+    return _call_claude(prompt)
 
 
 INSIGHT_SYSTEM_PROMPT = """You are a development coach reviewing an AI coding session transcript. Your goal is to provide actionable, evidence-based feedback on how the session went.
@@ -142,17 +145,10 @@ Guidelines:
 def extract_insights(transcript: str, policy: str) -> dict:
     """Send transcript + policy to claude -p and return parsed insights.
 
+    Raises ClaudeNotFoundError if claude CLI is not installed.
     Raises RuntimeError if claude CLI fails or response is unparseable.
     Returns dict with 'what_went_well', 'what_to_improve', 'notable' keys.
     """
-    if not check_claude_installed():
-        print(
-            "Error: 'claude' CLI not found.\n"
-            "Install Claude Code: https://claude.ai/install.sh",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
     prompt = f"""{INSIGHT_SYSTEM_PROMPT}
 
 ---
@@ -162,41 +158,7 @@ POLICY (for context on what the team values):
 ---
 TRANSCRIPT:
 {transcript}"""
-
-    try:
-        result = subprocess.run(
-            ["claude", "-p", "--output-format", "json"],
-            input=prompt,
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-    except subprocess.TimeoutExpired:
-        raise RuntimeError("claude -p timed out after 120 seconds")
-
-    if result.returncode != 0:
-        raise RuntimeError(f"claude -p failed:\n{result.stderr}")
-
-    raw = result.stdout.strip()
-    try:
-        wrapper = json.loads(raw)
-        if isinstance(wrapper, dict) and "result" in wrapper:
-            raw = wrapper["result"].strip()
-    except json.JSONDecodeError:
-        pass
-
-    fence_match = re.search(r"```(?:json)?\s*\n(.*?)\n\s*```", raw, re.DOTALL)
-    if fence_match:
-        raw = fence_match.group(1)
-
-    try:
-        insights = json.loads(raw)
-    except json.JSONDecodeError:
-        raise RuntimeError(
-            f"Failed to parse insights response as JSON.\nRaw output:\n{raw}"
-        )
-
-    return _validate_insights(insights)
+    return _validate_insights(_call_claude(prompt))
 
 
 def _validate_insights(raw: dict) -> dict:
@@ -265,14 +227,20 @@ def _group_by_category(verdicts: list[dict]) -> list[tuple[str, list[dict]]]:
     return list(groups.items())
 
 
+def count_verdicts(verdicts: list[dict]) -> dict[str, int]:
+    """Count verdicts by type, returning {"pass": N, "fail": N, "skip": N}."""
+    return {
+        "pass": sum(1 for v in verdicts if v["verdict"] == "PASS"),
+        "fail": sum(1 for v in verdicts if v["verdict"] == "FAIL"),
+        "skip": sum(1 for v in verdicts if v["verdict"] == "SKIP"),
+    }
+
+
 def format_verdicts(result: dict) -> str:
     """Format verdicts dict into a readable terminal string."""
     lines = []
     verdicts = result.get("verdicts", [])
-
-    pass_count = sum(1 for v in verdicts if v["verdict"] == "PASS")
-    fail_count = sum(1 for v in verdicts if v["verdict"] == "FAIL")
-    skip_count = sum(1 for v in verdicts if v["verdict"] == "SKIP")
+    counts = count_verdicts(verdicts)
 
     for category, group in _group_by_category(verdicts):
         lines.append(f"  {category}")
@@ -282,7 +250,7 @@ def format_verdicts(result: dict) -> str:
             lines.append(f"      {v['reasoning']}")
         lines.append("")
 
-    lines.append(f"Results: {pass_count} passed, {fail_count} failed, {skip_count} skipped")
+    lines.append(f"Results: {counts['pass']} passed, {counts['fail']} failed, {counts['skip']} skipped")
     lines.append("")
 
     summary = result.get("summary", "")
@@ -309,6 +277,7 @@ def format_report_markdown(session_results: list[dict]) -> str:
         label = entry["session_label"]
         result = entry["result"]
         verdicts = result.get("verdicts", [])
+        counts = count_verdicts(verdicts)
 
         lines.append(f"## {label}")
         lines.append("")
@@ -322,15 +291,12 @@ def format_report_markdown(session_results: list[dict]) -> str:
                 lines.append(f"  - {v['reasoning']}")
             lines.append("")
 
-        p = sum(1 for v in verdicts if v["verdict"] == "PASS")
-        f_ = sum(1 for v in verdicts if v["verdict"] == "FAIL")
-        s = sum(1 for v in verdicts if v["verdict"] == "SKIP")
-        total_pass += p
-        total_fail += f_
-        total_skip += s
+        total_pass += counts["pass"]
+        total_fail += counts["fail"]
+        total_skip += counts["skip"]
 
         lines.append("")
-        lines.append(f"**Score: {p} passed, {f_} failed, {s} skipped**")
+        lines.append(f"**Score: {counts['pass']} passed, {counts['fail']} failed, {counts['skip']} skipped**")
         lines.append("")
 
         summary = result.get("summary", "")

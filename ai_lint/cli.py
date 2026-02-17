@@ -8,7 +8,9 @@ from pathlib import Path
 import click
 
 from ai_lint.checker import (
+    ClaudeNotFoundError,
     check_claude_installed,
+    count_verdicts,
     extract_insights,
     format_insights,
     format_report_markdown,
@@ -135,17 +137,12 @@ def check(last, quiet, no_insights):
 
     skip_insights = quiet or no_insights
 
-    if skip_insights:
-        try:
-            with Spinner("Analyzing with claude..."):
+    try:
+        with Spinner("Analyzing with claude..."):
+            if skip_insights:
                 result = run_check(transcript, policy)
-        except RuntimeError as e:
-            click.echo(f"Error: {e}", err=True)
-            sys.exit(1)
-        insights = None
-    else:
-        try:
-            with Spinner("Analyzing with claude..."):
+                insights = None
+            else:
                 with ThreadPoolExecutor(max_workers=2) as pool:
                     verdict_future = pool.submit(run_check, transcript, policy)
                     insight_future = pool.submit(extract_insights, transcript, policy)
@@ -154,9 +151,9 @@ def check(last, quiet, no_insights):
                         insights = insight_future.result()
                     except Exception:
                         insights = None
-        except RuntimeError as e:
-            click.echo(f"Error: {e}", err=True)
-            sys.exit(1)
+    except (ClaudeNotFoundError, RuntimeError) as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
 
     output = format_verdicts(result)
     click.echo(output)
@@ -191,16 +188,14 @@ def report(count, outfile):
         try:
             with Spinner(f"[{i}/{len(to_check)}] Checking {s.label}..."):
                 result = run_check(transcript, policy)
-        except RuntimeError as e:
+        except (ClaudeNotFoundError, RuntimeError) as e:
             click.echo(f"  Error: {e}", err=True)
             continue
         session_results.append({"session_label": s.label, "result": result})
 
         # Show inline summary
-        verdicts = result.get("verdicts", [])
-        p = sum(1 for v in verdicts if v["verdict"] == "PASS")
-        f_ = sum(1 for v in verdicts if v["verdict"] == "FAIL")
-        click.echo(f"  -> {p} passed, {f_} failed")
+        counts = count_verdicts(result.get("verdicts", []))
+        click.echo(f"  -> {counts['pass']} passed, {counts['fail']} failed")
 
     if not session_results:
         click.echo("No sessions had messages to check.")
@@ -209,7 +204,7 @@ def report(count, outfile):
     # Terminal summary
     click.echo(f"\nChecked {len(session_results)} sessions.")
     total_fail = sum(
-        sum(1 for v in r["result"].get("verdicts", []) if v["verdict"] == "FAIL")
+        count_verdicts(r["result"].get("verdicts", []))["fail"]
         for r in session_results
     )
     if total_fail == 0:

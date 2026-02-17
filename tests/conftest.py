@@ -2,6 +2,7 @@
 
 import json
 import shutil
+import types
 from pathlib import Path
 
 import pytest
@@ -122,6 +123,14 @@ def sample_verdicts():
         ],
         "summary": "Mostly compliant session.",
     }
+
+
+@pytest.fixture()
+def make_fake_result():
+    """Factory fixture for creating fake subprocess results."""
+    def _make(returncode=0, stdout="", stderr=""):
+        return types.SimpleNamespace(returncode=returncode, stdout=stdout, stderr=stderr)
+    return _make
 
 
 @pytest.fixture()
