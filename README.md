@@ -48,6 +48,18 @@ ai-lint answers these questions automatically.
 ## Install
 
 ```bash
+brew install Telomelonia/tap/ai-lint
+```
+
+Or with uv:
+
+```bash
+uv tool install ai-lint
+```
+
+Or with pip:
+
+```bash
 pip install ai-lint
 ```
 
@@ -212,6 +224,18 @@ ai-lint sends your rules + the session transcript to Claude and gets back verdic
 ```bash
 ai-lint hook uninstall
 rm -rf ~/.ai-lint
+brew uninstall ai-lint
+```
+
+Or if installed with uv:
+
+```bash
+uv tool uninstall ai-lint
+```
+
+Or if installed with pip:
+
+```bash
 pip uninstall ai-lint
 ```
 
