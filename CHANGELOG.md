@@ -12,7 +12,7 @@ All notable changes to ai-lint will be documented in this file.
 
 ### Changed
 - LLM backend now always uses Sonnet (`claude-sonnet-4-5-20250929`) for consistent, fast analysis regardless of user's default model
-- Hook output now shows "Linting your last session..." before results and "Press Ctrl+C to dismiss" after, so users know what's happening and how to continue
+- Hook output now shows "Linting your last session..." immediately after session exit (before analysis runs) and waits for Enter to dismiss, so users see feedback sooner and don't need Ctrl+C
 - Hook output now wrapped in a visual box with session ID header and separator lines, so it looks intentional rather than appearing mid-terminal
 - SessionEnd hook now writes output directly to `/dev/tty` via `--tty` flag, bypassing Claude Code's stdout suppression — report is visible in the terminal after session ends
 - `ai-lint hook install` now auto-upgrades older hook formats instead of skipping with "already installed"
