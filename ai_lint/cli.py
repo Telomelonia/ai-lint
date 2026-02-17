@@ -155,11 +155,10 @@ def check(last, quiet, no_insights, tty):
 
     skip_insights = quiet or no_insights
 
-    if quiet:
-        _echo("\nai-lint: Your report is getting ready...\n", tty_file)
-
     try:
-        with Spinner("Analyzing with claude..."):
+        if quiet:
+            # Run silently — no spinner, no "getting ready" message.
+            # Results print once they're done.
             if skip_insights:
                 result = run_check(transcript, policy)
                 insights = None
@@ -172,6 +171,20 @@ def check(last, quiet, no_insights, tty):
                         insights = insight_future.result()
                     except Exception:
                         insights = None
+        else:
+            with Spinner("Analyzing with claude..."):
+                if skip_insights:
+                    result = run_check(transcript, policy)
+                    insights = None
+                else:
+                    with ThreadPoolExecutor(max_workers=2) as pool:
+                        verdict_future = pool.submit(run_check, transcript, policy)
+                        insight_future = pool.submit(extract_insights, transcript, policy)
+                        result = verdict_future.result()
+                        try:
+                            insights = insight_future.result()
+                        except Exception:
+                            insights = None
     except (ClaudeNotFoundError, RuntimeError) as e:
         _echo(f"Error: {e}", tty_file)
         sys.exit(1)

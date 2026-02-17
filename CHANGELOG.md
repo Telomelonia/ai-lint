@@ -7,6 +7,7 @@ All notable changes to ai-lint will be documented in this file.
 ### Fixed
 - ai-lint's own `claude -p` sessions no longer pollute the session list — `--no-session-persistence` prevents session file creation, and a defensive filter skips any existing ai-lint sessions
 - JSON parsing failure when LLM returns fenced JSON without trailing newline — fence regex now handles missing newlines, and a `{...}` extraction fallback catches remaining edge cases
+- Hook no longer spams "Your report is getting ready..." repeatedly in the terminal — quiet mode now runs silently with no spinner or status messages until results are ready
 
 ### Changed
 - SessionEnd hook now writes output directly to `/dev/tty` via `--tty` flag, bypassing Claude Code's stdout suppression — report is visible in the terminal after session ends

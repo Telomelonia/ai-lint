@@ -110,7 +110,7 @@ class TestCheck:
         result = runner.invoke(cli, ["check", "--last", "--quiet"])
         assert result.exit_code == 0
         assert "Parsing session" not in result.output
-        assert "Your report is getting ready" in result.output
+        assert "PASS" in result.output
 
     def test_session_picker(self, runner, full_setup, monkeypatch, sample_insights):
         fake_result = {
