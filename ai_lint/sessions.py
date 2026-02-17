@@ -54,7 +54,7 @@ class Session:
             parts.append(project)
         if first_msg:
             parts.append(f'"{first_msg}"')
-        return " | ".join(parts) if parts else self.session_id[:8]
+        return " | ".join(parts) if parts else self.session_id
 
 
 def _is_ai_lint_session(path: Path) -> bool:

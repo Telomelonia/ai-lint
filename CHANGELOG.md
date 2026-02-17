@@ -11,6 +11,7 @@ All notable changes to ai-lint will be documented in this file.
 - Hook no longer spams "Your report is getting ready..." repeatedly in the terminal — quiet mode now runs silently with no spinner or status messages until results are ready
 
 ### Changed
+- Session ID is now shown in full instead of truncated to 8 characters
 - LLM backend now always uses Sonnet (`claude-sonnet-4-5-20250929`) for consistent, fast analysis regardless of user's default model
 - Hook output now shows "Linting your last session..." immediately after session exit (before analysis runs) and waits for Enter to dismiss, so users see feedback sooner and don't need Ctrl+C
 - Hook output now wrapped in a visual box with session ID header and separator lines, so it looks intentional rather than appearing mid-terminal

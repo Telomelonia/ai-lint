@@ -140,7 +140,7 @@ def check(last, quiet, no_insights, tty):
 
     # Full parse
     if not quiet:
-        _echo(f"Parsing session {selected.session_id[:8]}...", tty_file)
+        _echo(f"Parsing session {selected.session_id}...", tty_file)
     parse_session(selected)
 
     if not selected.messages:
@@ -157,7 +157,7 @@ def check(last, quiet, no_insights, tty):
 
     if tty_file:
         _echo("", tty_file)
-        _echo("  Linting your last session...", tty_file)
+        _echo("  Linting your last session — results will appear here shortly.", tty_file)
 
     try:
         if quiet:
@@ -200,7 +200,7 @@ def check(last, quiet, no_insights, tty):
         separator = "─" * 40
         _echo("", tty_file)
         _echo(separator, tty_file)
-        _echo(f"  ai-lint report for session {selected.session_id[:8]}", tty_file)
+        _echo(f"  ai-lint report for session {selected.session_id}", tty_file)
         _echo("", tty_file)
         _echo(output, tty_file)
         if insights:

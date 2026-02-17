@@ -443,7 +443,7 @@ class TestSessionLabel:
             project="",
         )
         label = s.label
-        assert label == "abc12345"
+        assert label == "abc12345-long-id"
 
     def test_label_bad_timestamp(self):
         s = Session(
