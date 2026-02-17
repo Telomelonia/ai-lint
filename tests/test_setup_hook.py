@@ -5,7 +5,7 @@ import json
 import pytest
 
 from ai_lint.setup_hook import (
-    HOOK_COMMAND,
+    HOOK_COMMAND_TTY,
     HOOK_ENTRY,
     install_hook,
     is_hook_installed,
@@ -68,7 +68,7 @@ class TestInstallHook:
         install_hook()
         data = json.loads(claude_settings_dir.read_text())
         assert len(data["hooks"]["SessionEnd"]) == 1
-        assert HOOK_COMMAND in data["hooks"]["SessionEnd"][0]["hooks"][0]["command"]
+        assert data["hooks"]["SessionEnd"][0]["hooks"][0]["command"] == HOOK_COMMAND_TTY
 
     def test_idempotent(self, claude_settings_dir, capsys):
         install_hook()
@@ -76,7 +76,7 @@ class TestInstallHook:
         data = json.loads(claude_settings_dir.read_text())
         assert len(data["hooks"]["SessionEnd"]) == 1
         captured = capsys.readouterr()
-        assert "already installed" in captured.out
+        assert "Updated" in captured.out
 
     def test_preserves_other_hooks(self, claude_settings_dir):
         other_hook = {"matcher": "", "hooks": [{"type": "command", "command": "echo done"}]}

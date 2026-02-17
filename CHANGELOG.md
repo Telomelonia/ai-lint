@@ -9,7 +9,8 @@ All notable changes to ai-lint will be documented in this file.
 - JSON parsing failure when LLM returns fenced JSON without trailing newline — fence regex now handles missing newlines, and a `{...}` extraction fallback catches remaining edge cases
 
 ### Changed
-- `--quiet` mode now prints a message telling users they can start a new session while ai-lint runs
+- SessionEnd hook now writes output directly to `/dev/tty` via `--tty` flag, bypassing Claude Code's stdout suppression — report is visible in the terminal after session ends
+- `ai-lint hook install` now auto-upgrades older hook formats instead of skipping with "already installed"
 
 ## [0.3.0] - 2026-02-17
 

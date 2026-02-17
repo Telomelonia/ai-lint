@@ -89,19 +89,37 @@ def init():
     click.echo("\nDone! Run 'ai-lint check' to check a session, or 'ai-lint policy' to edit your rules.")
 
 
+def _echo(message, tty_file=None):
+    """Write message to tty_file if provided, otherwise click.echo."""
+    if tty_file:
+        tty_file.write(message + "\n")
+        tty_file.flush()
+    else:
+        click.echo(message)
+
+
 @cli.command()
 @click.option("--last", is_flag=True, help="Check the most recent session without prompting.")
 @click.option("--quiet", is_flag=True, help="Minimal output (for hook usage).")
 @click.option("--no-insights", is_flag=True, help="Skip session insights.")
-def check(last, quiet, no_insights):
+@click.option("--tty", is_flag=True, hidden=True, help="Write output to /dev/tty (for hook usage).")
+def check(last, quiet, no_insights, tty):
     """Pick a session and check it against your policy."""
+    # When --tty, write directly to the terminal so output is visible from hooks.
+    tty_file = None
+    if tty:
+        try:
+            tty_file = open("/dev/tty", "w")
+        except OSError:
+            pass  # fall back to normal stdout
+
     if not policy_exists():
-        click.echo("No policy found. Run 'ai-lint init' first.")
+        _echo("No policy found. Run 'ai-lint init' first.", tty_file)
         sys.exit(1)
 
     sessions = discover_sessions()
     if not sessions:
-        click.echo("No sessions found in ~/.claude/projects/")
+        _echo("No sessions found in ~/.claude/projects/", tty_file)
         sys.exit(1)
 
     if last:
@@ -122,23 +140,23 @@ def check(last, quiet, no_insights):
 
     # Full parse
     if not quiet:
-        click.echo(f"Parsing session {selected.session_id[:8]}...")
+        _echo(f"Parsing session {selected.session_id[:8]}...", tty_file)
     parse_session(selected)
 
     if not selected.messages:
-        click.echo("Session has no messages.")
+        _echo("Session has no messages.", tty_file)
         sys.exit(0)
 
     transcript = format_transcript(selected)
     policy = read_policy()
 
     if not quiet:
-        click.echo(f"Checking {len(selected.messages)} messages against policy...")
+        _echo(f"Checking {len(selected.messages)} messages against policy...", tty_file)
 
     skip_insights = quiet or no_insights
 
     if quiet:
-        click.echo("ai-lint: checking session compliance (you can start a new session while this runs)...")
+        _echo("\nai-lint: Your report is getting ready...\n", tty_file)
 
     try:
         with Spinner("Analyzing with claude..."):
@@ -155,14 +173,17 @@ def check(last, quiet, no_insights):
                     except Exception:
                         insights = None
     except (ClaudeNotFoundError, RuntimeError) as e:
-        click.echo(f"Error: {e}", err=True)
+        _echo(f"Error: {e}", tty_file)
         sys.exit(1)
 
     output = format_verdicts(result)
-    click.echo(output)
+    _echo(output, tty_file)
 
     if insights:
-        click.echo(format_insights(insights))
+        _echo(format_insights(insights), tty_file)
+
+    if tty_file:
+        tty_file.close()
 
 
 @cli.command()
