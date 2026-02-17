@@ -11,6 +11,7 @@ All notable changes to ai-lint will be documented in this file.
 - Hook no longer spams "Your report is getting ready..." repeatedly in the terminal — quiet mode now runs silently with no spinner or status messages until results are ready
 
 ### Changed
+- Hook output now wrapped in a visual box with session ID header and separator lines, so it looks intentional rather than appearing mid-terminal
 - SessionEnd hook now writes output directly to `/dev/tty` via `--tty` flag, bypassing Claude Code's stdout suppression — report is visible in the terminal after session ends
 - `ai-lint hook install` now auto-upgrades older hook formats instead of skipping with "already installed"
 

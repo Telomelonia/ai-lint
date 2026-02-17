@@ -190,13 +190,24 @@ def check(last, quiet, no_insights, tty):
         sys.exit(1)
 
     output = format_verdicts(result)
-    _echo(output, tty_file)
-
-    if insights:
-        _echo(format_insights(insights), tty_file)
 
     if tty_file:
+        # Wrap output in a visual box for hook mode
+        separator = "─" * 40
+        _echo("", tty_file)
+        _echo(separator, tty_file)
+        _echo(f"  ai-lint report for session {selected.session_id[:8]}", tty_file)
+        _echo("", tty_file)
+        _echo(output, tty_file)
+        if insights:
+            _echo(format_insights(insights), tty_file)
+        _echo(separator, tty_file)
+        _echo("", tty_file)
         tty_file.close()
+    else:
+        _echo(output)
+        if insights:
+            _echo(format_insights(insights))
 
 
 @cli.command()
