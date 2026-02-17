@@ -80,16 +80,26 @@ def _call_claude(prompt: str) -> dict:
     except json.JSONDecodeError:
         pass
 
-    fence_match = re.search(r"```(?:json)?\s*\n(.*?)\n\s*```", raw, re.DOTALL)
+    fence_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", raw, re.DOTALL | re.IGNORECASE)
     if fence_match:
-        raw = fence_match.group(1)
+        raw = fence_match.group(1).strip()
 
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
-        raise RuntimeError(
-            f"Failed to parse LLM response as JSON.\nRaw output:\n{raw}"
-        )
+        pass
+
+    # Last resort: extract outermost { ... } as JSON
+    brace_match = re.search(r"\{.*\}", raw, re.DOTALL)
+    if brace_match:
+        try:
+            return json.loads(brace_match.group(0))
+        except json.JSONDecodeError:
+            pass
+
+    raise RuntimeError(
+        f"Failed to parse LLM response as JSON.\nRaw output:\n{raw}"
+    )
 
 
 def run_check(transcript: str, policy: str) -> dict:

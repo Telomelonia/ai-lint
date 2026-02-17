@@ -94,6 +94,24 @@ class TestCallClaude:
         _call_claude("prompt")
         assert "--no-session-persistence" in captured["args"]
 
+    def test_fence_no_newline_before_close(self, monkeypatch, make_fake_result):
+        """Fence extraction works when closing ``` has no leading newline."""
+        monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
+        data = {"key": "value"}
+        fenced = "```json\n" + json.dumps(data) + "```"
+        fake = make_fake_result(stdout=fenced)
+        monkeypatch.setattr("subprocess.run", lambda *a, **kw: fake)
+        assert _call_claude("prompt") == data
+
+    def test_brace_extraction_fallback(self, monkeypatch, make_fake_result):
+        """Falls back to extracting outermost { ... } when fences don't match."""
+        monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
+        data = {"key": "value"}
+        messy = "Here is the result: " + json.dumps(data) + " hope that helps"
+        fake = make_fake_result(stdout=messy)
+        monkeypatch.setattr("subprocess.run", lambda *a, **kw: fake)
+        assert _call_claude("prompt") == data
+
     def test_invalid_json_raises(self, monkeypatch, make_fake_result):
         monkeypatch.setattr("ai_lint.checker.check_claude_installed", lambda: True)
         fake = make_fake_result(stdout="not json at all")

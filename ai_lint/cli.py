@@ -137,6 +137,9 @@ def check(last, quiet, no_insights):
 
     skip_insights = quiet or no_insights
 
+    if quiet:
+        click.echo("ai-lint: checking session compliance (you can start a new session while this runs)...")
+
     try:
         with Spinner("Analyzing with claude..."):
             if skip_insights:

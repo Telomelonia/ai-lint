@@ -6,6 +6,10 @@ All notable changes to ai-lint will be documented in this file.
 
 ### Fixed
 - ai-lint's own `claude -p` sessions no longer pollute the session list — `--no-session-persistence` prevents session file creation, and a defensive filter skips any existing ai-lint sessions
+- JSON parsing failure when LLM returns fenced JSON without trailing newline — fence regex now handles missing newlines, and a `{...}` extraction fallback catches remaining edge cases
+
+### Changed
+- `--quiet` mode now prints a message telling users they can start a new session while ai-lint runs
 
 ## [0.3.0] - 2026-02-17
 
