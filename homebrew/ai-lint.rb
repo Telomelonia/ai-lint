@@ -3,7 +3,7 @@ class AiLint < Formula
 
   desc "Check AI coding session compliance against user-defined policies"
   homepage "https://github.com/aryanshukla/ai-lint"
-  url "https://github.com/aryanshukla/ai-lint/archive/refs/tags/v0.1.0.tar.gz"
+  url "https://github.com/aryanshukla/ai-lint/archive/refs/tags/v0.3.8.tar.gz"
   sha256 "PLACEHOLDER_SHA256"
   license "MIT"
 
